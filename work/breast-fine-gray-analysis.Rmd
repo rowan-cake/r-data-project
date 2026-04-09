@@ -1,0 +1,227 @@
+---
+title: "Breast Cancer Fine-Gray Model Setup"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)  # data import, cleaning, and summaries
+library(cmprsk)  # Fine-Gray competing-risks model tools
+knitr::opts_chunk$set(collapse = TRUE, comment = "#")
+```
+
+## Load Data
+
+```{r load-data}
+breast_raw <- read_csv(
+  "data/Breast Cancer METABRIC.csv",  # read the METABRIC dataset
+  show_col_types = FALSE
+)
+
+breast <- breast_raw %>%
+  mutate(
+    os_months = as.numeric(`Overall Survival (Months)`),  # overall survival time in months
+    vital_status = na_if(`Patient's Vital Status`, ""),  # disease death / other death / living
+    age_dx = as.numeric(`Age at Diagnosis`),  # age at diagnosis
+    tumor_size = as.numeric(`Tumor Size`),  # tumor size
+    tumor_stage = factor(na_if(as.character(`Tumor Stage`), "NA")),  # tumor stage
+    hist_grade = factor(na_if(as.character(`Neoplasm Histologic Grade`), "NA")),  # histologic grade
+    er_status = factor(na_if(`ER Status`, "")),  # ER status
+    pr_status = factor(na_if(`PR Status`, "")),  # PR status
+    her2_status = factor(na_if(`HER2 Status`, ""))  # HER2 status
+  )
+```
+
+## EDA
+
+Taking a look at some of the rows of the data.
+```{r preview-code, results='hide'}
+breast_preview <- breast %>%
+  select(`Patient ID`, os_months, vital_status, age_dx, tumor_size, tumor_stage, hist_grade) %>%
+  slice_head(n = 6)
+```
+
+```{r preview-output, echo=FALSE}
+breast_preview
+```
+
+Plotting the distributions of age at diagnosis and vital status.
+
+```{r age-status-plot-code, results='hide'}
+age_plot <- breast %>%
+  ggplot(aes(x = age_dx)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  labs(title = "Age at Diagnosis Distribution", x = "Age at Diagnosis", y = "Count")
+
+status_plot <- breast %>%
+  filter(!is.na(vital_status)) %>%
+  ggplot(aes(x = vital_status)) +
+  geom_bar(fill = "darkorange") +
+  labs(title = "Vital Status Distribution", x = "Vital Status", y = "Count") +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+```{r age-status-plot-output, echo=FALSE}
+print(age_plot)
+print(status_plot)
+```
+
+```{r summary-code, results='hide'}
+breast_summary <- breast %>%
+  summarise(
+    patients = n(),  # total number of patients
+    os_time_missing = sum(is.na(os_months)),  # missing overall survival times
+    vital_status_missing = sum(is.na(vital_status)),  # missing vital status labels
+    median_age_dx = median(age_dx, na.rm = TRUE),  # median age at diagnosis
+    median_os_months = median(os_months, na.rm = TRUE)  # median observed OS time
+  )
+```
+
+```{r summary-output, echo=FALSE}
+breast_summary
+```
+
+The dataset `Breast Cancer METABRIC.csv` contains 2,509 observations and includes overall survival time, relapse information, and clinical tumor characteristics. **For the Fine-Gray model, I will focus on disease-specific death as the event of interest and other-cause death as the competing event.**
+
+## Building the Fine-Gray model
+
+For this notebook, I am using a competing-risks analysis. That means I will use overall survival time together with a three-level event code: `0` for censored/living, `1` for died of disease, and `2` for died of other causes.
+
+### Step 1: Build the competing-risk modeling dataset
+
+Keep only the variables needed for the Fine-Gray model and create the competing-risk event code.
+```{r fg-data-code, results='hide'}
+breast_fg_data <- breast %>%
+  transmute(
+    patient_id = `Patient ID`,
+    os_months,
+    fg_status = case_when(
+      vital_status == "Living" ~ 0L,
+      vital_status == "Died of Disease" ~ 1L,
+      vital_status == "Died of Other Causes" ~ 2L,
+      TRUE ~ NA_integer_
+    ),
+    age_dx,
+    tumor_size,
+    tumor_stage,
+    hist_grade,
+    er_status,
+    pr_status,
+    her2_status
+  ) %>%
+  drop_na()
+```
+
+Peep the new dataset
+```{r fg-data-output, echo=FALSE}
+glimpse(breast_fg_data)
+```
+
+### Step 2: Create the Fine-Gray inputs
+
+This is using the `cmprsk` package. Instead of a `Surv()` object, the Fine-Gray model takes three main pieces: a follow-up time, a competing-risk status variable, and a numeric matrix of predictor variables. Here, `breast_fg_time` stores the overall survival time in months, and `breast_fg_status` stores whether each patient was censored (`0`), died of disease (`1`), or died of other causes (`2`).
+
+The last piece is `breast_fg_covariates`. The `crr()` function wants the predictors in numeric matrix form, so I use `model.matrix()` to convert the variables into the format the model needs. Continuous variables stay numeric, while factor variables like tumor stage or receptor status get expanded into indicator columns. I remove the first column afterward because that is just the intercept, and I do not need to pass that separately into `crr()`(NOTE I had a lot of help from ChatGPT here).
+```{r fg-inputs-code, results='hide'}
+breast_fg_time <- breast_fg_data$os_months
+breast_fg_status <- breast_fg_data$fg_status
+
+breast_fg_covariates <- model.matrix(
+  ~ age_dx + tumor_size + tumor_stage + hist_grade + er_status + pr_status + her2_status,
+  data = breast_fg_data
+)[, -1, drop = FALSE]
+```
+
+```{r fg-inputs-output, echo=FALSE}
+head(
+  tibble(
+    os_months = breast_fg_time,
+    fg_status = breast_fg_status
+  )
+)
+```
+
+### Step 3: Fit the Fine-Gray model
+
+Using the `cmprsk` package again, I fit a Fine-Gray competing-risks model following the documentation.
+```{r fg-model-code, results='hide'}
+breast_fg_model <- crr(
+  ftime = breast_fg_time,
+  fstatus = breast_fg_status,
+  cov1 = breast_fg_covariates,
+  failcode = 1,
+  cencode = 0
+)
+```
+
+```{r fg-model-output, echo=FALSE}
+breast_fg_model
+```
+
+### Step 4: Analysis and Visualization
+
+This Fine-Gray model mostly confirms what we would expect clinically. The strongest signal comes from tumor stage, where the coefficients are extremely large and positive, ranging from about 9.30 to 11.44, which indicates a much higher risk of disease-specific death as stage increases. Grade 3 tumors also point in the same direction, with a positive coefficient of about 0.71, suggesting higher-risk disease than the reference grade.
+
+The model also shows a positive effect for tumor size (0.011) and HER2-positive status (0.48), which both support the same general story of more aggressive disease being linked to worse outcomes. So overall, the Fine-Gray model is not giving a surprising result here. Instead, it is largely confirming, with data and coefficients, what we would already expect: more advanced and more aggressive tumor features are associated with a greater risk of death from disease.
+
+The cumulative incidence plot below shows disease-specific death over time by tumor stage. This is a good fit for a Fine-Gray workflow because it respects the competing-risk setup instead of treating other-cause death like ordinary censoring.
+
+```{r fg-cuminc-code, results='hide'}
+breast_stage_cuminc_data <- breast_fg_data %>%
+  filter(tumor_stage %in% c("1", "2", "3", "4"))
+
+breast_stage_cuminc <- cuminc(
+  ftime = breast_stage_cuminc_data$os_months,
+  fstatus = breast_stage_cuminc_data$fg_status,
+  group = breast_stage_cuminc_data$tumor_stage
+)
+
+stage_colors <- c(
+  "1" = "#1b9e77",
+  "2" = "#377eb8",
+  "3" = "#e67e22",
+  "4" = "#d62728"
+)
+```
+
+```{r fg-cuminc-output, echo=FALSE}
+plot(
+  breast_stage_cuminc[c("1 1", "2 1", "3 1", "4 1")],
+  col = stage_colors,
+  lwd = 2,
+  curvlab = c("Stage 1", "Stage 2", "Stage 3", "Stage 4"),
+  xlab = "Overall survival time (months)",
+  ylab = "Cumulative incidence",
+  main = "Cumulative Incidence by Tumor Stage"
+)
+```
+
+The forest plot below turns the Fine-Gray coefficients into subdistribution hazard ratios with confidence intervals. Points to the right of `1` suggest higher disease-specific risk, while points to the left of `1` suggest lower risk.
+
+```{r fg-forest-code, results='hide'}
+fg_coef <- breast_fg_model$coef
+fg_se <- sqrt(diag(breast_fg_model$var))
+
+fg_forest_data <- tibble(
+  term = names(fg_coef),
+  coefficient = unname(fg_coef),
+  subdistribution_hr = exp(unname(fg_coef)),
+  conf_low = exp(fg_coef - qnorm(0.975) * fg_se),
+  conf_high = exp(fg_coef + qnorm(0.975) * fg_se)
+) %>%
+  mutate(term = factor(term, levels = rev(term)))
+
+fg_forest_plot <- ggplot(fg_forest_data, aes(x = subdistribution_hr, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbarh(aes(xmin = conf_low, xmax = conf_high), height = 0.2, color = "gray40") +
+  geom_point(size = 3, color = "navy") +
+  labs(
+    title = "Forest Plot of Fine-Gray Coefficients",
+    x = "Fine-Gray Coefficients",
+    y = NULL
+  ) +
+  theme_minimal()
+```
+
+```{r fg-forest-output, echo=FALSE}
+print(fg_forest_plot)
+```
