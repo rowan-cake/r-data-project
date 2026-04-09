@@ -1,0 +1,90 @@
+---
+title: "Kidney Cox Model Setup"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)  # data import, cleaning, and summaries
+library(survival)  # survival-analysis tools for the later Cox model
+knitr::opts_chunk$set(collapse = TRUE, comment = "#")  # cleaner printed output
+```
+
+## Load Data
+
+```{r load-data}
+kidney_raw <- read_csv(
+  "data/kidrecurr.csv",  # read the kidney recurrence dataset
+  show_col_types = FALSE,  # suppress column type messages when knitting
+  locale = locale(encoding = "UTF-8")  # safely handle the BOM-tainted header
+)
+
+names(kidney_raw)[1] <- "patient"  # clean the first column name
+
+kidney <- kidney_raw %>%
+  mutate(
+    patient = as.integer(patient),  # patient identifier
+    time1 = as.numeric(time1),  # first follow-up time
+    infect1 = as.integer(infect1),  # first-interval event flag
+    time2 = as.numeric(time2),  # second follow-up time
+    infect2 = as.integer(infect2),  # second-interval event flag
+    age = as.numeric(age),  # baseline age
+    gender = factor(gender, levels = c(0, 1), labels = c("Female", "Male")),  # label sex code
+    gn = factor(gn, levels = c(0, 1), labels = c("No", "Yes")),  # glomerulonephritis flag
+    an = factor(an, levels = c(0, 1), labels = c("No", "Yes")),  # analgesic nephropathy flag
+    pkd = factor(pkd, levels = c(0, 1), labels = c("No", "Yes"))  # polycystic kidney disease flag
+  )
+```
+
+## EDA
+
+Taking a look at some of the rows of the data.
+```{r sanity-check-preview-code, results='hide'}
+kidney_preview <- kidney %>%
+  slice_head(n = 6)  # preview the first six rows
+```
+
+```{r sanity-check-preview-output, echo=FALSE}
+kidney_preview
+```
+
+Plotting the distributions of age and gender.
+
+
+```{r age-gender-plot-code, results='hide'}
+age_plot <- kidney %>%
+  ggplot(aes(x = age)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  scale_x_continuous(
+    breaks = seq(9, 75, by = 5)
+  ) +
+  labs(title = "Age Distribution", x = "Age", y = "Count")
+
+gender_plot <- kidney %>%
+  ggplot(aes(x = gender)) +
+  geom_bar(fill = "darkorange") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Count")
+```
+
+```{r age-gender-plot-output, echo=FALSE}
+print(age_plot)
+print(gender_plot)
+```
+
+```{r sanity-check-summary-code, results='hide'}
+kidney_summary <- kidney %>%
+  summarise(
+    patients = n(),  # total number of patients
+    first_events = sum(infect1 == 1, na.rm = TRUE),  # number with a first infection
+    censored_first_interval = sum(infect1 == 0, na.rm = TRUE),  # number censored in interval 1
+    median_time1 = median(time1, na.rm = TRUE),  # median first follow-up time
+    median_age = median(age, na.rm = TRUE)  # median baseline age
+  )
+```
+
+```{r sanity-check-summary-output, echo=FALSE}
+kidney_summary
+```
+
+## Next Step
+
+This notebook is only set up to confirm that R Markdown, package loading, and data import work correctly. Add the Cox model after this file renders successfully.
