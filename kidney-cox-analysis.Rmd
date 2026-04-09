@@ -154,3 +154,33 @@ The more noticeable signals are with gender, AN, and PKD. Male patients have a h
 Even so, these results should be treated carefully. The p-values for gender and PKD are close to significance, but they do not quite cross the usual cutoff(of `0.05` from my experience), and the confidence intervals are wide. That means the model is picking up possible signals, but the estimates are still fairly uncertain. 
 
 Overall, this model suggests some potentially important differences in infection risk, but with this small sample size can't really say anything conclusive I dont think.
+
+
+The forest plot below shows the hazard ratios from the Cox model. Points to the right of `1` suggest higher risk, while points to the left of `1` suggest lower risk. If the confidence interval crosses `1`, the estimate is still uncertain.
+
+```{r forest-plot-code, results='hide'}
+cox_summary <- summary(kidney_cox_model)
+
+forest_data <- tibble(
+  term = rownames(cox_summary$coefficients),
+  hazard_ratio = cox_summary$coefficients[, "exp(coef)"],
+  conf_low = cox_summary$conf.int[, "lower .95"],
+  conf_high = cox_summary$conf.int[, "upper .95"]
+) %>%
+  mutate(term = factor(term, levels = rev(term)))
+
+forest_plot <- ggplot(forest_data, aes(x = hazard_ratio, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbarh(aes(xmin = conf_low, xmax = conf_high), height = 0.2, color = "gray40") +
+  geom_point(size = 3, color = "navy") +
+  labs(
+    title = "Forest Plot of Hazard Ratios",
+    x = "Hazard ratio",
+    y = NULL
+  ) +
+  theme_minimal()
+```
+
+```{r forest-plot-output, echo=FALSE}
+print(forest_plot)
+```
