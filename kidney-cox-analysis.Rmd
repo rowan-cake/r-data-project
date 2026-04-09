@@ -84,7 +84,65 @@ kidney_summary <- kidney %>%
 ```{r sanity-check-summary-output, echo=FALSE}
 kidney_summary
 ```
+Understanding the datasets features(https://www.kaggle.com/datasets/hxnzheng/kidrecurr): 
 
-## Next Step
+The dataset `kidrecurr.csv` contains 38 observations and 10 variables.
 
-This notebook is only set up to confirm that R Markdown, package loading, and data import work correctly. Add the Cox model after this file renders successfully.
+| Variable | Description |
+|---|---|
+| `Patient` | Patient number |
+| `time1` | Time one of recurrence of infection, days |
+| `infect1` | Indicator infection one (`1 = yes`, `0 = no`) |
+| `time2` | Time two of recurrence of infection, days |
+| `infect2` | Indicator infection two (`1 = yes`, `0 = no`) |
+| `age` | Patient's age |
+| `gender` | Patient's gender (`1 = female`, `0 = male`) |
+| `gn` | Disease type GN (`1 = yes`, `0 = no`) |
+| `an` | Disease type AN (`1 = yes`, `0 = no`) |
+| `pkd` | Disease type PKD (`1 = yes`, `0 = no`) |
+
+## Building the Cox model
+
+For this notebook, I am using a first event analysis. That means I will use only `time1` and `infect1`, so each patient contributes one follow-up time and one event indicator.
+
+### Step 1: Build the first event modeling dataset
+
+Drop the time2 and infect2 columns
+```{r kidney-cox-data-code, results='hide'}
+kidney_cox_data <- kidney %>%
+  select(patient, time1, infect1, age, gender, gn)
+```
+
+Peep the new dataset
+```{r kidney-cox-data-output, echo=FALSE}
+glimpse(kidney_cox_data)
+```
+
+### Step 2: Create the survival object
+
+This is using a package I found called Survival and its creating a object to say the follow up time and whether the event happened(number without a "+") or not.
+```{r kidney-surv-code, results='hide'}
+kidney_surv <- Surv(
+  time = kidney_cox_data$time1,
+  event = kidney_cox_data$infect1
+)
+```
+
+```{r kidney-surv-output, echo=FALSE}
+kidney_surv
+```
+
+### Step 3: Fit the Cox model
+Using the survival package again I fit a Cox model following the documentation.
+```{r kidney-cox-model-code, results='hide'}
+kidney_cox_model <- coxph(
+  kidney_surv ~ age + gender + gn,
+  data = kidney_cox_data
+)
+```
+
+```{r kidney-cox-model-output, echo=FALSE}
+summary(kidney_cox_model)
+```
+
+### Step 4: Analysis and Visualization

@@ -417,12 +417,127 @@ gender_plot &lt;- kidney %&gt;%
 #   patients first_events censored_first_interval median_time1 median_age
 #      &lt;int&gt;        &lt;int&gt;                   &lt;int&gt;        &lt;dbl&gt;      &lt;dbl&gt;
 # 1       38           27                      11         39.5       45.5</code></pre>
+<p>Understanding the datasets features(<a href="https://www.kaggle.com/datasets/hxnzheng/kidrecurr" class="uri">https://www.kaggle.com/datasets/hxnzheng/kidrecurr</a>):</p>
+<p>The dataset <code>kidrecurr.csv</code> contains 38 observations and
+10 variables.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Patient</code></td>
+<td>Patient number</td>
+</tr>
+<tr class="even">
+<td><code>time1</code></td>
+<td>Time one of recurrence of infection, days</td>
+</tr>
+<tr class="odd">
+<td><code>infect1</code></td>
+<td>Indicator infection one (<code>1 = yes</code>,
+<code>0 = no</code>)</td>
+</tr>
+<tr class="even">
+<td><code>time2</code></td>
+<td>Time two of recurrence of infection, days</td>
+</tr>
+<tr class="odd">
+<td><code>infect2</code></td>
+<td>Indicator infection two (<code>1 = yes</code>,
+<code>0 = no</code>)</td>
+</tr>
+<tr class="even">
+<td><code>age</code></td>
+<td>Patient’s age</td>
+</tr>
+<tr class="odd">
+<td><code>gender</code></td>
+<td>Patient’s gender (<code>1 = female</code>,
+<code>0 = male</code>)</td>
+</tr>
+<tr class="even">
+<td><code>gn</code></td>
+<td>Disease type GN (<code>1 = yes</code>, <code>0 = no</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>an</code></td>
+<td>Disease type AN (<code>1 = yes</code>, <code>0 = no</code>)</td>
+</tr>
+<tr class="even">
+<td><code>pkd</code></td>
+<td>Disease type PKD (<code>1 = yes</code>, <code>0 = no</code>)</td>
+</tr>
+</tbody>
+</table>
 </div>
-<div id="next-step" class="section level2">
-<h2>Next Step</h2>
-<p>This notebook is only set up to confirm that R Markdown, package
-loading, and data import work correctly. Add the Cox model after this
-file renders successfully.</p>
+<div id="building-the-cox-model" class="section level2">
+<h2>Building the Cox model</h2>
+<p>For this notebook, I am using a first event analysis. That means I
+will use only <code>time1</code> and <code>infect1</code>, so each
+patient contributes one follow-up time and one event indicator.</p>
+<div id="step-1-build-the-first-event-modeling-dataset" class="section level3">
+<h3>Step 1: Build the first event modeling dataset</h3>
+<p>Drop the time2 and infect2 columns</p>
+<pre class="r"><code>kidney_cox_data &lt;- kidney %&gt;%
+  select(patient, time1, infect1, age, gender, gn)</code></pre>
+<p>Peep the new dataset</p>
+<pre><code># Rows: 38
+# Columns: 6
+# $ patient &lt;int&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,…
+# $ time1   &lt;dbl&gt; 16, 13, 22, 318, 30, 24, 9, 30, 53, 154, 7, 141, 38, 70, 536, …
+# $ infect1 &lt;int&gt; 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1,…
+# $ age     &lt;dbl&gt; 28.0, 48.0, 32.0, 31.5, 10.0, 16.5, 51.0, 55.5, 69.0, 51.5, 44…
+# $ gender  &lt;fct&gt; Female, Male, Female, Male, Female, Male, Female, Male, Male, …
+# $ gn      &lt;fct&gt; No, Yes, No, No, No, No, Yes, Yes, No, Yes, No, No, No, No, No…</code></pre>
+</div>
+<div id="step-2-create-the-survival-object" class="section level3">
+<h3>Step 2: Create the survival object</h3>
+<p>This is using a package I found called Survival and its creating a
+object to say the follow up time and whether the event happened(number
+without a “+”) or not.</p>
+<pre class="r"><code>kidney_surv &lt;- Surv(
+  time = kidney_cox_data$time1,
+  event = kidney_cox_data$infect1
+)</code></pre>
+<pre><code>#  [1]  16   13+  22  318   30   24    9   30   53  154    7  141   38   70+ 536 
+# [16]   4+ 185  114  159+ 108+ 562   24+  66   39   40  113+ 132   34    2   26 
+# [31]  27    5+ 152  190  119   54+   6+   8+</code></pre>
+</div>
+<div id="step-3-fit-the-cox-model" class="section level3">
+<h3>Step 3: Fit the Cox model</h3>
+<p>Using the survival package again I fit a Cox model following the
+documentation.</p>
+<pre class="r"><code>kidney_cox_model &lt;- coxph(
+  kidney_surv ~ age + gender + gn,
+  data = kidney_cox_data
+)</code></pre>
+<pre><code># Call:
+# coxph(formula = kidney_surv ~ age + gender + gn, data = kidney_cox_data)
+# 
+#   n= 38, number of events= 27 
+# 
+#                 coef exp(coef)  se(coef)      z Pr(&gt;|z|)
+# age        -0.002122  0.997880  0.013546 -0.157    0.875
+# genderMale -0.384165  0.681019  0.457467 -0.840    0.401
+# gnYes       0.171858  1.187509  0.458355  0.375    0.708
+# 
+#            exp(coef) exp(-coef) lower .95 upper .95
+# age           0.9979     1.0021    0.9717     1.025
+# genderMale    0.6810     1.4684    0.2778     1.669
+# gnYes         1.1875     0.8421    0.4836     2.916
+# 
+# Concordance= 0.596  (se = 0.075 )
+# Likelihood ratio test= 0.84  on 3 df,   p=0.8
+# Wald test            = 0.88  on 3 df,   p=0.8
+# Score (logrank) test = 0.89  on 3 df,   p=0.8</code></pre>
+</div>
+<div id="step-4-analysis" class="section level3">
+<h3>Step 4: Analysis</h3>
+</div>
 </div>
 
 

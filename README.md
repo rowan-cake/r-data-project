@@ -15,3 +15,8 @@ For the role of Statistician under Dr.Gill I want to show that I am prepared to 
 - Use good visulization tools.
 - Learn the basics.
 
+
+#### Sources
+
+- General Cox model knowledge , "https://www.youtube.com/watch?v=-g6YLWG2yYo"
+- `coxph()` , "https://cran.r-project.org/web/packages/survival/survival.pdf"
