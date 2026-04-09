@@ -483,16 +483,18 @@ patient contributes one follow-up time and one event indicator.</p>
 <h3>Step 1: Build the first event modeling dataset</h3>
 <p>Drop the time2 and infect2 columns</p>
 <pre class="r"><code>kidney_cox_data &lt;- kidney %&gt;%
-  select(patient, time1, infect1, age, gender, gn)</code></pre>
+  select(patient, time1, infect1, age, gender, gn,an,pkd)</code></pre>
 <p>Peep the new dataset</p>
 <pre><code># Rows: 38
-# Columns: 6
+# Columns: 8
 # $ patient &lt;int&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,…
 # $ time1   &lt;dbl&gt; 16, 13, 22, 318, 30, 24, 9, 30, 53, 154, 7, 141, 38, 70, 536, …
 # $ infect1 &lt;int&gt; 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1,…
 # $ age     &lt;dbl&gt; 28.0, 48.0, 32.0, 31.5, 10.0, 16.5, 51.0, 55.5, 69.0, 51.5, 44…
 # $ gender  &lt;fct&gt; Female, Male, Female, Male, Female, Male, Female, Male, Male, …
-# $ gn      &lt;fct&gt; No, Yes, No, No, No, No, Yes, Yes, No, Yes, No, No, No, No, No…</code></pre>
+# $ gn      &lt;fct&gt; No, Yes, No, No, No, No, Yes, Yes, No, Yes, No, No, No, No, No…
+# $ an      &lt;fct&gt; No, No, No, No, No, No, No, No, Yes, No, Yes, No, Yes, Yes, No…
+# $ pkd     &lt;fct&gt; No, No, No, No, No, No, No, No, No, No, No, No, No, No, No, No…</code></pre>
 </div>
 <div id="step-2-create-the-survival-object" class="section level3">
 <h3>Step 2: Create the survival object</h3>
@@ -512,31 +514,59 @@ without a “+”) or not.</p>
 <p>Using the survival package again I fit a Cox model following the
 documentation.</p>
 <pre class="r"><code>kidney_cox_model &lt;- coxph(
-  kidney_surv ~ age + gender + gn,
+  kidney_surv ~ age + gender + gn + an + pkd,
   data = kidney_cox_data
 )</code></pre>
 <pre><code># Call:
-# coxph(formula = kidney_surv ~ age + gender + gn, data = kidney_cox_data)
+# coxph(formula = kidney_surv ~ age + gender + gn + an + pkd, data = kidney_cox_data)
 # 
 #   n= 38, number of events= 27 
 # 
-#                 coef exp(coef)  se(coef)      z Pr(&gt;|z|)
-# age        -0.002122  0.997880  0.013546 -0.157    0.875
-# genderMale -0.384165  0.681019  0.457467 -0.840    0.401
-# gnYes       0.171858  1.187509  0.458355  0.375    0.708
+#                coef exp(coef) se(coef)      z Pr(&gt;|z|)  
+# age        -0.00169   0.99831  0.01613 -0.105   0.9165  
+# genderMale -0.96595   0.38062  0.49847 -1.938   0.0526 .
+# gnYes       0.07179   1.07443  0.58530  0.123   0.9024  
+# anYes       0.81242   2.25334  0.62668  1.296   0.1948  
+# pkdYes     -2.08352   0.12449  1.19635 -1.742   0.0816 .
+# ---
+# Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 # 
 #            exp(coef) exp(-coef) lower .95 upper .95
-# age           0.9979     1.0021    0.9717     1.025
-# genderMale    0.6810     1.4684    0.2778     1.669
-# gnYes         1.1875     0.8421    0.4836     2.916
+# age           0.9983     1.0017   0.96724     1.030
+# genderMale    0.3806     2.6273   0.14328     1.011
+# gnYes         1.0744     0.9307   0.34117     3.384
+# anYes         2.2533     0.4438   0.65977     7.696
+# pkdYes        0.1245     8.0327   0.01193     1.299
 # 
-# Concordance= 0.596  (se = 0.075 )
-# Likelihood ratio test= 0.84  on 3 df,   p=0.8
-# Wald test            = 0.88  on 3 df,   p=0.8
-# Score (logrank) test = 0.89  on 3 df,   p=0.8</code></pre>
+# Concordance= 0.735  (se = 0.05 )
+# Likelihood ratio test= 9.38  on 5 df,   p=0.09
+# Wald test            = 8.34  on 5 df,   p=0.1
+# Score (logrank) test = 8.59  on 5 df,   p=0.1</code></pre>
 </div>
-<div id="step-4-analysis" class="section level3">
-<h3>Step 4: Analysis</h3>
+<div id="step-4-analysis-and-visualization" class="section level3">
+<h3>Step 4: Analysis and Visualization</h3>
+<p>The expanded Cox model gives a few suggestive patterns, but none of
+them are strong enough to treat as firm conclusions. Age has a hazard
+ratio of about <code>0.998</code>, which is almost exactly
+<code>1</code>, so age does not appear to change the risk of first
+infection very much in this model. GN is similar, with a hazard ratio of
+about <code>1.07</code>, which is also close to <code>1</code> and does
+not suggest much of a clear effect.</p>
+<p>The more noticeable signals are with gender, AN, and PKD. Male
+patients have a hazard ratio of about <code>0.38</code>, which means
+their estimated risk of first infection is lower than the reference
+group. AN has a hazard ratio of about <code>2.25</code>, which points
+toward a higher estimated risk because values above <code>1</code> mean
+the event is happening faster. PKD has a hazard ratio of about
+<code>0.12</code>, which points toward a lower estimated risk because
+values below <code>1</code> mean the event is happening more slowly.</p>
+<p>Even so, these results should be treated carefully. The p-values for
+gender and PKD are close to significance, but they do not quite cross
+the usual cutoff, and the confidence intervals are wide. That means the
+model is picking up possible signals, but the estimates are still fairly
+uncertain. Overall, this model suggests some potentially important
+differences in infection risk, but with this sample size the findings
+are best described as exploratory.</p>
 </div>
 </div>
 

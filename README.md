@@ -18,5 +18,5 @@ For the role of Statistician under Dr.Gill I want to show that I am prepared to 
 
 #### Sources
 
-- General Cox model knowledge , "https://www.youtube.com/watch?v=-g6YLWG2yYo"
+- General Cox model knowledge , "https://www.youtube.com/watch?v=-g6YLWG2yYo", "https://en.wikipedia.org/wiki/Proportional_hazards_model"
 - `coxph()` , "https://cran.r-project.org/web/packages/survival/survival.pdf"
