@@ -6,8 +6,8 @@ For the role of Statistician under Dr.Gill I want to show that I am prepared to 
 # Goal
 
 - Create 3 seprate notebooks in `R` each with the goal of:
-    - Implementation of the Cox model using the `kidrecurr.csv` dataset.
-    - Implementation of the Fine-Gray competing risks model using the `Breast Cancer METABRIC.csv` dataset. 
+    - [x] Implementation of the Cox model using the `kidrecurr.csv` dataset.
+    - [x] Implementation of the Fine-Gray competing risks model using the `Breast Cancer METABRIC.csv` dataset. 
     - Implementation of a multivariable logistic regression for CKD using the `Chronic_Kidney_Dsease_data.csv` dataset.
 
 ### Sub Goals
