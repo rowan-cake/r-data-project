@@ -20,6 +20,8 @@ For the role of Statistician under Dr.Gill I want to show that I am prepared to 
 
 - General Cox model knowledge , "https://www.youtube.com/watch?v=-g6YLWG2yYo", "https://en.wikipedia.org/wiki/Proportional_hazards_model"
 - `coxph()` , "https://cran.r-project.org/web/packages/survival/survival.pdf"
+- Dataset for Cox model, "https://www.kaggle.com/datasets/hxnzheng/kidrecurr/data"
 
 - Fine-Gray model knowledge , "https://en.wikipedia.org/wiki/Relative_survival"
 - `crr()` , "https://en.wikipedia.org/wiki/Relative_survival", "https://cran.r-project.org/web/packages/cmprsk/cmprsk.pdf" 
+- Dataset for Fine-Gray model, "https://www.kaggle.com/datasets/gunesevitan/breast-cancer-metabric"
